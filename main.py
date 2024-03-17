@@ -3,8 +3,13 @@ import random
 board = "000000000"
 Games = []
 INITIAL_BEADS_NO = 15
-NUM_OF_ROUNDS = 10000
+NUM_OF_ROUNDS = 1000000
 gameEnded = False
+botXWins = 0
+botOWins = 0
+ties = 0
+botXBoxes = open("BotXBoxes.txt", "r+")
+botOBoxes = open("BotOBoxes.txt", "r+")
 
 
 class Bot:
@@ -19,7 +24,7 @@ class Bot:
     if self.boxes.get(state) is not None:
       box = self.boxes[state]
     else:
-      self.boxes.update({(state, Box(boardId))})
+      self.boxes.update({(state, Box(boardId, 0))})
       box = self.boxes[state]
     sumOfBeads = sum(box.getBeads())
     boxBeads = box.getBeads()
@@ -40,25 +45,43 @@ class Bot:
   def botLost(self):
     for move in self.movesMade:
       box = self.boxes[move[0]]
-      box.removeMove(move[1])
-    Games.append(showBoard(board))
+      box.removePoint(move[1])
+
+  def botWon(self):
+    for move in self.movesMade:
+      box = self.boxes[move[0]]
+      box.addPointWon(move[1])
+
+  def botTied(self):
+    for move in self.movesMade:
+      box = self.boxes[move[0]]
+      box.addPointTie(move[1])
 
 
 class Box:
 
-  def __init__(self, board):
+  def __init__(self, board, beads):
     self.id = ternary_to_decimal(board)
-    self.beads = []
     self.board = board
-    for i in range(9):
-      if self.board[i] == "0":
-        self.beads.append(INITIAL_BEADS_NO)
-      else:
-        self.beads.append(0)
+    if beads == 0:
+      self.beads = []
+      for i in range(9):
+        if self.board[i] == "0":
+          self.beads.append(INITIAL_BEADS_NO)
+        else:
+          self.beads.append(0)
+    else:
+      self.beads = beads
 
-  def removeMove(self, move):
-    if self.beads[move] != 1:
+  def removePoint(self, move):
+    if self.beads[move] != 0 and sum(self.beads) != 1:
       self.beads[move] -= 1
+
+  def addPointWon(self, move):
+    self.beads[move] += 2
+
+  def addPointTie(self, move):
+    self.beads[move] += 1
 
   def getBeads(self):
     return self.beads
@@ -135,46 +158,126 @@ def boardCheck(board_id):
     return 0
 
 
+botX = Bot("1")
+botO = Bot("2")
+
+
+def writeBoxes(bot):
+  if bot == "X":
+    boxes = botX.boxes
+  else:
+    boxes = botO.boxes
+  boxesKeys = list(boxes.keys())
+  boxesValues = list(boxes.values())
+  result = ""
+  for i in range(len(boxesKeys)):
+    beadsShow = str(boxesValues[i].beads)
+    beadsShow = beadsShow.replace(',', '')
+    beadsShow = beadsShow.replace(']', '')
+    beadsShow = beadsShow.replace('[', '')
+    result += str(boxesKeys[i]) + " " + str(
+        boxesValues[i].board) + " " + beadsShow
+    result += "\n"
+  return result
+
+
+def readBoxes(input):
+  boxes = {}
+  for line in input:
+    word = ""
+    box = []
+    boxClass = ""
+    numOfWords = 0
+    beads = []
+    for letter in line:
+      if letter != " " and letter != "\n":
+        word += letter
+      elif letter == "\n":
+        beads.append(word)
+      else:
+        if numOfWords == 1:
+          box.append(word)
+        elif numOfWords == 2:
+          boxClass = word
+        else:
+          beads.append(word)
+          word = ""
+        numOfWords += 1
+    boxes.update({int(word): Box(boxClass, beads)})
+  return boxes
+
+
 if __name__ == "__main__":
-  botX = Bot("1")
-  botO = Bot("2")
-  for i in range(NUM_OF_ROUNDS):
-    gameEnded = False
-    board = "000000000"
-    while not gameEnded:
-      board = botX.makeMove(board)
-      if boardCheck(board) == 2:
-        botX.botLost()
-        botX.movesMade = []
-        botO.movesMade = []
-        gameEnded = True
-        break
-      elif boardCheck(board) == 1:
-        botO.botLost()
-        gameEnded = True
-        botX.movesMade = []
-        botO.movesMade = []
-        break
-      elif boardCheck(board) == 3:
-        gameEnded = True
-        botX.movesMade = []
-        botO.movesMade = []
-        break
-      board = botO.makeMove(board)
-      if boardCheck(board) == 2:
-        botX.botLost()
-        gameEnded = True
-        botX.movesMade = []
-        botO.movesMade = []
-        break
-      elif boardCheck(board) == 1:
-        botO.botLost()
-        gameEnded = True
-        botX.movesMade = []
-        botO.movesMade = []
-        break
-      elif boardCheck(board) == 3:
-        gameEnded = True
-        botX.movesMade = []
-        botO.movesMade = []
-        break
+  command = input("Decide What You Want To Do: ")
+  if command == "train":
+    for i in range(NUM_OF_ROUNDS):
+      gameEnded = False
+      board = "000000000"
+      while not gameEnded:
+        board = botX.makeMove(board)
+        if boardCheck(board) == 2:
+          botOWins += 1
+          botX.botLost()
+          botO.botWon()
+          botX.movesMade = []
+          botO.movesMade = []
+          Games.append(showBoard(board))
+          gameEnded = True
+          break
+        elif boardCheck(board) == 1:
+          botXWins += 1
+          botO.botLost()
+          botX.botWon()
+          Games.append(showBoard(board))
+          gameEnded = True
+          botX.movesMade = []
+          botO.movesMade = []
+          break
+        elif boardCheck(board) == 3:
+          gameEnded = True
+          botX.botTied()
+          botO.botTied()
+          Games.append(showBoard(board))
+          botX.movesMade = []
+          botO.movesMade = []
+          ties += 1
+          break
+        board = botO.makeMove(board)
+        if boardCheck(board) == 2:
+          botOWins += 1
+          botX.botLost()
+          botO.botWon()
+          Games.append(showBoard(board))
+          gameEnded = True
+          botX.movesMade = []
+          botO.movesMade = []
+          break
+        elif boardCheck(board) == 1:
+          botXWins += 1
+          botO.botLost()
+          botX.botWon()
+          Games.append(showBoard(board))
+          gameEnded = True
+          botX.movesMade = []
+          botO.movesMade = []
+          break
+        elif boardCheck(board) == 3:
+          gameEnded = True
+          botX.botTied()
+          botO.botTied()
+          Games.append(showBoard(board))
+          botX.movesMade = []
+          botO.movesMade = []
+          ties += 1
+          break
+    botXBoxes.write(writeBoxes("X"))
+    botOBoxes.write(writeBoxes("O"))
+  elif command == "reuseX":
+    botX.boxes = readBoxes(botXBoxes)
+    print(botX.boxes)
+  elif command == "reuseO":
+    botO.boxes = readBoxes(botOBoxes)
+
+print(botXWins)
+print(botOWins)
+print(ties)
