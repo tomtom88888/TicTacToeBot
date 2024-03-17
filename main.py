@@ -210,6 +210,9 @@ def readBoxes(input):
 if __name__ == "__main__":
   command = input("Decide What You Want To Do: ")
   if command == "train":
+    print("It Will Take Approximately 8 Minutes")
+    botXBoxes.truncate(0)
+    botOBoxes.truncate(0)
     for i in range(NUM_OF_ROUNDS):
       gameEnded = False
       board = "000000000"
